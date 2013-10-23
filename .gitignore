@@ -5,3 +5,6 @@
 *.war
 *.ear
 TalkR Java/nbproject/private/
+TalkR Java/build/classes/
+TalkR Java/build/
+TalkR Java/dist/README.TXT
