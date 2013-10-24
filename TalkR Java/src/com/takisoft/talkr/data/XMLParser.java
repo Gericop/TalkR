@@ -55,15 +55,12 @@ public class XMLParser extends DefaultHandler {
             switch (currentTag) {
                 case PageData.TAG_PAGE_TITLE:
                     currentPage.setTitle(data);
-                    currentTag = null;
                     break;
                 case PageData.TAG_PAGE_NS:
                     currentPage.setNamespace(data);
-                    currentTag = null;
                     break;
                 case PageData.TAG_PAGE_REVISION_TEXT:
                     currentPage.setText(data);
-                    currentTag = null;
                     break;
             }
         }

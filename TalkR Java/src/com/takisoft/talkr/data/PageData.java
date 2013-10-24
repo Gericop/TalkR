@@ -22,7 +22,11 @@ public class PageData {
     }
 
     public void setTitle(String title) {
-        this.title = title;
+        if (this.title == null) {
+            this.title = title;
+        } else {
+            this.title = this.title + title;
+        }
     }
 
     public String getText() {
@@ -30,7 +34,11 @@ public class PageData {
     }
 
     public void setText(String text) {
-        this.text = text;
+        if (this.text == null) {
+            this.text = text;
+        } else {
+            this.text = this.text + text;
+        }
     }
 
     boolean checkText() {

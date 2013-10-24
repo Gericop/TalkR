@@ -54,6 +54,12 @@ public class TalkR extends JFrame implements XMLParserListener {
                 System.out.println(page.getText());
             }
         }
+        
+        if(page.getTitle().equalsIgnoreCase("fog") || page.getTitle().equalsIgnoreCase("bubifrizura")){
+            System.out.println("- TITLE: " + page.getTitle());
+            System.out.println("- TEXT: " + page.getText());
+            System.out.println("-------");
+        }
     }
 
     @Override
