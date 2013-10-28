@@ -6,8 +6,6 @@ package com.takisoft.talkr.data;
  */
 public class PageData {
 
-    public static final int NS_DEFAULT = 0;
-    public static final int NS_CATEGORY = 14;
     public static final String TAG_PAGE = "page";
     public static final String TAG_PAGE_NS = "ns";
     public static final String TAG_PAGE_TITLE = "title";
@@ -42,11 +40,8 @@ public class PageData {
     }
 
     boolean checkText() {
-//        if(text != null && text.contains("Kategória:magyar")){
-//            return true;
-//        }
-
-        if (namespace == NS_DEFAULT && text != null && text.contains("{{hun")) {
+        if ((namespace == DetailConstants.NS_DEFAULT && text != null && text.contains("{{hun")) ||
+                (namespace == DetailConstants.NS_CATEGORY && text != null && title != null && title.contains(":hu:"))) {
             return true;
         }
 
@@ -63,5 +58,13 @@ public class PageData {
         } catch (NumberFormatException e) {
             System.err.println(e);
         }
+    }
+
+    public boolean checkNamespace() {
+        if (namespace == DetailConstants.NS_DEFAULT || namespace == DetailConstants.NS_CATEGORY) {
+            return true;
+        }
+
+        return false;
     }
 }

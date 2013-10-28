@@ -16,6 +16,7 @@ public class XMLParser extends DefaultHandler {
     XMLParserListener listener;
     PageData currentPage;
     String currentTag;
+    boolean skipTag = false;
 
     public XMLParser(XMLParserListener listener) {
         try {
@@ -42,9 +43,14 @@ public class XMLParser extends DefaultHandler {
         switch (qName) {
             case PageData.TAG_PAGE:
                 currentPage = new PageData();
+                skipTag = false;
                 break;
             default:
-                currentTag = qName;
+                if (skipTag) {
+                    currentTag = null;
+                } else {
+                    currentTag = qName;
+                }
         }
     }
 
@@ -58,6 +64,9 @@ public class XMLParser extends DefaultHandler {
                     break;
                 case PageData.TAG_PAGE_NS:
                     currentPage.setNamespace(data);
+                    if(!currentPage.checkNamespace()){
+                        skipTag = true;
+                    }
                     break;
                 case PageData.TAG_PAGE_REVISION_TEXT:
                     currentPage.setText(data);
@@ -89,6 +98,7 @@ public class XMLParser extends DefaultHandler {
     public static interface XMLParserListener {
 
         public abstract void onPageDataAvailable(PageData page);
+
         public void onXMLParsingFinished();
     }
 }
