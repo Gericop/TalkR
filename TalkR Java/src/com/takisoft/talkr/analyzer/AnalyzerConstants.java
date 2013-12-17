@@ -6,6 +6,10 @@ package com.takisoft.talkr.analyzer;
  */
 public class AnalyzerConstants {
 
+    // magánhangzó-harmónia
+    public static final char[] VOWEL_FRONT = new char[]{'e', 'é', 'i', 'í', 'ö', 'ő', 'ü', 'ű'};
+    public static final char[] VOWEL_BACK = new char[]{'a', 'á', 'o', 'ó', 'u', 'ú'};
+    
     // igekötők
     public static final String[] COVERBS = new String[]{
         "abba",

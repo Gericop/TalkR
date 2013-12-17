@@ -1,5 +1,6 @@
 package com.takisoft.talkr;
 
+import com.takisoft.talkr.analyzer.Analyzer;
 import com.takisoft.talkr.data.Coverb;
 import com.takisoft.talkr.data.DetailConstants;
 import com.takisoft.talkr.data.PageData;
@@ -9,22 +10,34 @@ import com.takisoft.talkr.data.Word;
 import com.takisoft.talkr.data.XMLParser;
 import com.takisoft.talkr.data.XMLParser.XMLParserListener;
 import com.takisoft.talkr.helper.NodeResolver;
+import com.takisoft.talkr.ui.Message;
+import com.takisoft.talkr.ui.Message.Who;
+import com.takisoft.talkr.ui.MessageBoard;
+import com.takisoft.talkr.utils.Utils;
+import java.awt.BorderLayout;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.BoxLayout;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 import javax.swing.WindowConstants;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.factory.GraphDatabaseBuilder;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
+import org.neo4j.graphdb.index.IndexHits;
 
 /**
  * The Hungarian chatter bot.
+ *
  * @author Gericop
  */
 public class TalkR extends JFrame implements XMLParserListener {
@@ -33,8 +46,25 @@ public class TalkR extends JFrame implements XMLParserListener {
     boolean isWordDbReady = false;
     private NodeResolver resolver;
     private GraphDatabaseService graphDb;
+    private Analyzer analyzer;
+
+    private final MessageBoard board = new MessageBoard();
+    private final JTextArea userInput = new JTextArea(1, 80);
+    private final JScrollPane scrollPane = new JScrollPane(board, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+
+    private final KeyAdapter keyListener;
 
     public TalkR() {
+        this.keyListener = new KeyAdapter() {
+
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    e.consume();
+                    sendDataToAnalyzer();
+                }
+            }
+        };
     }
 
     public void initWindow() {
@@ -42,6 +72,17 @@ public class TalkR extends JFrame implements XMLParserListener {
         setSize(640, 480);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        
+        board.setScrollPane(scrollPane);
+        
+        add(scrollPane, BorderLayout.CENTER);
+        
+        //userInput.setLineWrap(true);
+        //userInput.setWrapStyleWord(true);
+        userInput.addKeyListener(keyListener);
+        
+        add(userInput, BorderLayout.SOUTH);
+        
         setVisible(true);
     }
 
@@ -55,9 +96,20 @@ public class TalkR extends JFrame implements XMLParserListener {
 
         }
 
+        analyzer = new Analyzer(resolver);
+
         testFindWords();
 
         //wordTester();
+    }
+
+    private void sendDataToAnalyzer() {
+        String input = userInput.getText();
+        userInput.setText("");
+
+        board.add(new Message(Who.HUMAN, input));
+
+        analyzer.analyzeSentence(input);
     }
 
     private void testFindWords() {
@@ -92,6 +144,33 @@ public class TalkR extends JFrame implements XMLParserListener {
         } else {
             System.err.println("NOT FOUND: szép");
         }
+
+        //resolver.findWordsOrderByScore("+fogad*");
+        //resolver.getAllNodes();
+        // teszt a szó lebontására
+        String word = "kanalával";
+        StringBuilder sb = new StringBuilder(word);
+        IndexHits<Node> hits = null;
+        while ((hits = resolver.getWordsStartingWith(sb.toString())) == null) {
+            sb.deleteCharAt(sb.length() - 1);
+            if (sb.length() == 0) {
+                System.err.println("'" + word + "' cannot be found.");
+                break;
+            }
+        }
+
+        if (hits != null) {
+            hits.close();
+            hits = resolver.getWordsWithFuzzy(sb.toString());
+            System.out.println("--- FOUND FOR '" + sb.toString() + "' ---");
+            for (Node hit : hits) {
+                Word w = new Word(hit);
+                System.out.println(w.getWord() + " | " + w.getType() + " | " + hits.currentScore());
+            }
+            hits.close();
+        }
+        System.out.println("NO ACCENT: " + Utils.removeAccentMarks(";ÁőÖ21üŰú-"));
+        System.out.println("ABC ONLY: " + Utils.removePunctuation(";ÁőÖ21üŰú-"));
     }
 
     private void wordTester() {
@@ -134,7 +213,7 @@ public class TalkR extends JFrame implements XMLParserListener {
                         if (coverbs != null) {
                             System.out.println("- CO");
                             for (Coverb coverb : coverbs) {
-                                System.out.println("\t" + coverb.getWord()+word.getWord());
+                                System.out.println("\t" + coverb.getWord() + word.getWord());
                             }
                         }
                     }
@@ -150,13 +229,11 @@ public class TalkR extends JFrame implements XMLParserListener {
         GraphDatabaseBuilder graphDbBuilder = new GraphDatabaseFactory().newEmbeddedDatabaseBuilder(DB_PATH);
 
         //Map<String, String> dbConfig = new HashMap<>();
-
         String nodeIndices = DetailConstants.PROP_KEY_OBJECT_ID + ",";
         nodeIndices += DetailConstants.PROP_KEY_TYPE + ",";
         nodeIndices += DetailConstants.PROP_KEY_WORD_TYPE;
 
         //String relIndices = DetailConstants.PROP_;
-
         graphDb = graphDbBuilder.setConfig(GraphDatabaseSettings.node_keys_indexable, nodeIndices).
                 setConfig(GraphDatabaseSettings.relationship_keys_indexable, "chance").
                 setConfig(GraphDatabaseSettings.node_auto_indexing, "true").
@@ -167,7 +244,6 @@ public class TalkR extends JFrame implements XMLParserListener {
         registerShutdownHook(graphDb);
 
         //graphDb.index().getNodeAutoIndexer().getAutoIndex();
-
         resolver = new NodeResolver(graphDb);
     }
 

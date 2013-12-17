@@ -8,14 +8,20 @@ import com.takisoft.talkr.data.DetailConstants.RelTypes;
 import com.takisoft.talkr.data.Synonym;
 import com.takisoft.talkr.data.Word;
 import com.takisoft.talkr.data.Word.WordType;
+import com.takisoft.talkr.utils.Utils;
 import java.util.ArrayList;
+import java.util.Iterator;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.Transaction;
+import org.neo4j.graphdb.index.Index;
 import org.neo4j.graphdb.index.IndexHits;
+import org.neo4j.graphdb.index.IndexManager;
 import org.neo4j.graphdb.index.ReadableIndex;
+import org.neo4j.helpers.collection.MapUtil;
+import org.neo4j.index.lucene.QueryContext;
 
 /**
  *
@@ -23,11 +29,27 @@ import org.neo4j.graphdb.index.ReadableIndex;
  */
 public class NodeResolver {
 
-    private GraphDatabaseService graphDb;
+    private final GraphDatabaseService graphDb;
     private Transaction tx;
+    private Index<Node> indexWords;
+    private Index<Node> indexWordsWoAccentMark;
 
     public NodeResolver(GraphDatabaseService graphDb) {
         this.graphDb = graphDb;
+        createFullTextIndex();
+        createAccentMarklessIndex();
+    }
+
+    private void createFullTextIndex() {
+        IndexManager index = graphDb.index();
+        indexWords = index.forNodes("words-fulltext",
+                MapUtil.stringMap(IndexManager.PROVIDER, "lucene", "type", "fulltext"));
+    }
+
+    private void createAccentMarklessIndex() {
+        IndexManager index = graphDb.index();
+        indexWordsWoAccentMark = index.forNodes("words-wo-accentmark",
+                MapUtil.stringMap(IndexManager.PROVIDER, "lucene", "type", "fulltext"));
     }
 
     public void beginTransaction() {
@@ -56,6 +78,7 @@ public class NodeResolver {
                 node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_WORD);
                 node.setProperty(DetailConstants.PROP_KEY_WORD_TYPE, word.getType().name());
 
+                addNodeToFullTextIndex(node, word.getWord());
                 //tx.success();
             } catch (Exception e) {
                 System.err.println(e);
@@ -74,14 +97,14 @@ public class NodeResolver {
                 addSynonym(node, synonym, word.getType());
             }
         }
-        
+
         ArrayList<Antonym> antonyms = word.getAntonyms();
         if (!antonyms.isEmpty()) {
             for (Antonym antonym : antonyms) {
                 addAntonym(node, antonym, word.getType());
             }
         }
-        
+
         ArrayList<Coverb> coverbs = word.getCoverbs();
         if (coverbs != null && !coverbs.isEmpty()) {
             for (Coverb coverb : coverbs) {
@@ -113,6 +136,8 @@ public class NodeResolver {
                 node.setProperty(DetailConstants.PROP_KEY_OBJECT_ID, word.getWord());
                 node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_WORD);
                 node.setProperty(DetailConstants.PROP_KEY_WORD_TYPE, type.name());
+
+                addNodeToFullTextIndex(node, word.getWord());
             }
 
             if (!existsRelationship(parent, node, RelTypes.SYNONYM)) {
@@ -127,7 +152,7 @@ public class NodeResolver {
             //tx.finish();
         }
     }
-    
+
     public void addAntonym(Node parent, Antonym word, WordType type) {
         if (tx == null) {
             throw new IllegalStateException("Must be in a transaction!");
@@ -142,6 +167,8 @@ public class NodeResolver {
                 node.setProperty(DetailConstants.PROP_KEY_OBJECT_ID, word.getWord());
                 node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_WORD);
                 node.setProperty(DetailConstants.PROP_KEY_WORD_TYPE, type.name());
+
+                addNodeToFullTextIndex(node, word.getWord());
             }
 
             if (!existsRelationship(parent, node, RelTypes.ANTONYM)) {
@@ -156,8 +183,8 @@ public class NodeResolver {
             //tx.finish();
         }
     }
-    
-    public void addCoverb(Node parent, Coverb word){
+
+    public void addCoverb(Node parent, Coverb word) {
         if (tx == null) {
             throw new IllegalStateException("Must be in a transaction!");
         }
@@ -171,6 +198,8 @@ public class NodeResolver {
                 node.setProperty(DetailConstants.PROP_KEY_OBJECT_ID, word.getWord());
                 node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_WORD);
                 node.setProperty(DetailConstants.PROP_KEY_WORD_TYPE, WordType.VERB.name());
+
+                addNodeToFullTextIndex(node, word.getWord());
             }
 
             if (!existsRelationship(parent, node, RelTypes.COVERB)) {
@@ -185,7 +214,7 @@ public class NodeResolver {
             //tx.finish();
         }
     }
-    
+
     public Node addCategory(Category category) {
         if (tx == null) {
             throw new IllegalStateException("Must be in a transaction!");
@@ -209,7 +238,7 @@ public class NodeResolver {
         if (linkedCategories != null) {
             for (Category linkedCat : linkedCategories) {
                 Node otherNode = addCategory(linkedCat);
-                if (!existsRelationship(node, otherNode, RelTypes.LINKED)) {
+                if (node != null && !existsRelationship(node, otherNode, RelTypes.LINKED)) {
                     Relationship rel = node.createRelationshipTo(otherNode, RelTypes.LINKED);
                     // TODO kell valami property a kapcsolathoz?
                 }
@@ -270,5 +299,84 @@ public class NodeResolver {
         }
 
         return null;
+    }
+
+    private void addNodeToFullTextIndex(Node node, String index) {
+        if (indexWords == null) {
+            return;
+        }
+
+        indexWords.add(node, DetailConstants.PROP_KEY_OBJECT_ID, index);
+
+        addNodeToAccentMarklessIndex(node, index);
+    }
+
+    private void addNodeToAccentMarklessIndex(Node node, String index) {
+        if (indexWordsWoAccentMark == null) {
+            return;
+        }
+
+        indexWordsWoAccentMark.add(node, DetailConstants.PROP_KEY_OBJECT_ID, Utils.removeAccentMarks(index));
+    }
+
+    public void findWordsOrderByScore(String word) {
+        if (indexWords == null) {
+            return;
+        }
+
+        IndexHits<Node> hits = indexWords.query(DetailConstants.PROP_KEY_OBJECT_ID, new QueryContext(word + "*").sortByScore());
+        Iterator<Node> iter = hits.iterator();
+
+        if (!iter.hasNext()) {
+            System.err.println(word + " not found...");
+        }
+
+        while (iter.hasNext()) {
+            // hits sorted by relevance (score)
+            System.out.println(new Word(iter.next()).getWord() + " | " + hits.currentScore());
+        }
+    }
+
+    // TODO csak teszt
+    public void getAllNodes() {
+        IndexHits<Node> hits = indexWords.query("*:*");
+        int i = 0;
+        for (Node hit : hits) {
+            i++;
+        }
+        hits.close();
+
+        System.out.println("Nodes: " + i);
+    }
+
+    public IndexHits<Node> getWordsStartingWith(String start) {
+        IndexHits<Node> hits = indexWords.query(DetailConstants.PROP_KEY_OBJECT_ID, start + "*");
+
+        if (!hits.hasNext()) {
+            return null;
+        }
+
+        return hits;
+    }
+    
+    public IndexHits<Node> getWordsWithFuzzy(String start) {
+        IndexHits<Node> hits = indexWords.query(DetailConstants.PROP_KEY_OBJECT_ID, start + "~");
+
+        if (!hits.hasNext()) {
+            return null;
+        }
+
+        return hits;
+    }
+    
+    public IndexHits<Node> getWordsWithFuzzy(String start, double number) {
+        System.out.println(">> "+ start + "~" + number);
+        IndexHits<Node> hits = indexWords.query(DetailConstants.PROP_KEY_OBJECT_ID, start + "~" + number);
+
+        if (!hits.hasNext()) {
+            return null;
+        }
+
+        return hits;
     }
 }
