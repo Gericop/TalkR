@@ -10,7 +10,7 @@ public class DetailConstants {
 
     public enum RelTypes implements RelationshipType {
 
-        SYNONYM, ANTONYM, LINKED, COVERB
+        SYNONYM, ANTONYM, LINKED, COVERB, GROUPED
     }
     // PARENTHESIS
     public static final String P_START = "\\{\\{";
@@ -64,4 +64,15 @@ public class DetailConstants {
     // PROPERTY VALUES
     public static final String PROP_TYPE_WORD = "word";
     public static final String PROP_TYPE_CAT = "category";
+    
+    
+    // PROPERTY GROUP and EXPRESSION
+    public static final String PROP_TYPE_GROUP = "group";
+    public static final String PROP_KEY_G_RESPONSE = "response";
+    public static final String PROP_KEY_G_INDEX = "index";
+    public static final String PROP_KEY_G_ID = "groupId";
+    
+    public static final String PROP_TYPE_EXPRESSION = "expression";
+    public static final String PROP_KEY_E_VALUE = "value";
+    public static final String PROP_KEY_E_NEUTRAL = "neutral";
 }

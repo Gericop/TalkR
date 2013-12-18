@@ -1,5 +1,7 @@
 package com.takisoft.talkr.helper;
 
+import com.takisoft.talkr.ai.Expression;
+import com.takisoft.talkr.ai.Group;
 import com.takisoft.talkr.data.Antonym;
 import com.takisoft.talkr.data.Category;
 import com.takisoft.talkr.data.Coverb;
@@ -12,6 +14,7 @@ import com.takisoft.talkr.utils.Utils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
@@ -35,6 +38,8 @@ public class NodeResolver {
     private Index<Node> indexWords;
     private Index<Node> indexWordsWoAccentMark;
 
+    private Index<Node> indexExpressions;
+
     public NodeResolver(GraphDatabaseService graphDb) {
         this.graphDb = graphDb;
         createFullTextIndex();
@@ -44,6 +49,9 @@ public class NodeResolver {
     private void createFullTextIndex() {
         IndexManager index = graphDb.index();
         indexWords = index.forNodes("words-fulltext",
+                MapUtil.stringMap(IndexManager.PROVIDER, "lucene", "type", "fulltext"));
+
+        indexExpressions = index.forNodes("exps-fulltext",
                 MapUtil.stringMap(IndexManager.PROVIDER, "lucene", "type", "fulltext"));
     }
 
@@ -301,28 +309,28 @@ public class NodeResolver {
 
         return null;
     }
-    
-    public ArrayList<Node> findNodesByRelationship(Node node, RelTypes type){
+
+    public ArrayList<Node> findNodesByRelationship(Node node, RelTypes type) {
         ArrayList<Node> nodes = new ArrayList<>();
-        
+
         Iterable<Relationship> iter = node.getRelationships(type);
-        for(Relationship rel : iter){
+        for (Relationship rel : iter) {
             nodes.add(rel.getOtherNode(node));
         }
-        
+
         return nodes;
     }
-    
-    public ArrayList<Category> findCategoriesByRelationship(Node node, RelTypes type){
+
+    public ArrayList<Category> findCategoriesByRelationship(Node node, RelTypes type) {
         ArrayList<Category> nodes = new ArrayList<>();
-        
+
         Iterable<Relationship> iter = node.getRelationships(type);
-        for(Relationship rel : iter){
+        for (Relationship rel : iter) {
             nodes.add(new Category(rel.getOtherNode(node)));
         }
-        
+
         Collections.sort(nodes);
-        
+
         return nodes;
     }
 
@@ -383,7 +391,7 @@ public class NodeResolver {
 
         return hits;
     }
-    
+
     public IndexHits<Node> getWordsWithFuzzy(String start) {
         IndexHits<Node> hits = indexWords.query(DetailConstants.PROP_KEY_OBJECT_ID, start + "~");
 
@@ -393,9 +401,9 @@ public class NodeResolver {
 
         return hits;
     }
-    
+
     public IndexHits<Node> getWordsWithFuzzy(String start, double number) {
-        System.out.println(">> "+ start + "~" + number);
+        System.out.println(">> " + start + "~" + number);
         IndexHits<Node> hits = indexWords.query(DetailConstants.PROP_KEY_OBJECT_ID, start + "~" + number);
 
         if (!hits.hasNext()) {
@@ -403,5 +411,138 @@ public class NodeResolver {
         }
 
         return hits;
+    }
+
+    // --------------------
+    // GROUP and EXPRESSION
+    // --------------------
+    public Node findGroup(String groupId) {
+        ReadableIndex<Node> autoNodeIndex = graphDb.index().getNodeAutoIndexer().getAutoIndex();
+        IndexHits<Node> nodes = autoNodeIndex.get(DetailConstants.PROP_KEY_G_ID, groupId);
+        for (Node node : nodes) {
+            if (DetailConstants.PROP_TYPE_GROUP.equals(node.getProperty(DetailConstants.PROP_KEY_TYPE))) {
+                return node;
+            }
+        }
+
+        return null;
+    }
+
+    public Node findGroup(int index) {
+        ReadableIndex<Node> autoNodeIndex = graphDb.index().getNodeAutoIndexer().getAutoIndex();
+        IndexHits<Node> nodes = autoNodeIndex.get(DetailConstants.PROP_KEY_G_INDEX, index);
+        for (Node node : nodes) {
+            if (DetailConstants.PROP_TYPE_GROUP.equals(node.getProperty(DetailConstants.PROP_KEY_TYPE))) {
+                return node;
+            }
+        }
+
+        return null;
+    }
+
+    public Node findExpression(String expValue) {
+        ReadableIndex<Node> autoNodeIndex = graphDb.index().getNodeAutoIndexer().getAutoIndex();
+        IndexHits<Node> nodes = autoNodeIndex.get(DetailConstants.PROP_KEY_E_VALUE, expValue);
+        for (Node node : nodes) {
+            if (DetailConstants.PROP_TYPE_EXPRESSION.equals(node.getProperty(DetailConstants.PROP_KEY_TYPE))) {
+                return node;
+            }
+        }
+
+        return null;
+    }
+
+    public IndexHits<Node> getExpressionsWithFuzzy(String exp) {
+        IndexHits<Node> hits = indexExpressions.query(DetailConstants.PROP_KEY_E_VALUE, exp + "~");
+
+        if (!hits.hasNext()) {
+            return null;
+        }
+
+        return hits;
+    }
+
+    public Node addGroup(Group group) {
+        if (tx == null) {
+            throw new IllegalStateException("Must be in a transaction!");
+        }
+
+        Node node = findGroup(group.getId());
+
+        if (node == null) {
+            try {
+                node = graphDb.createNode();
+
+                node.setProperty(DetailConstants.PROP_KEY_G_ID, group.getId());
+                node.setProperty(DetailConstants.PROP_KEY_G_INDEX, group.getIndex());
+
+                if (group.getResponse() != null) {
+                    node.setProperty(DetailConstants.PROP_KEY_G_RESPONSE, group.getResponse());
+                }
+
+                node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_GROUP);
+            } catch (Exception e) {
+                tx.failure();
+            }
+        }
+
+        List<Expression> exps = group.getExpressions();
+
+        if (exps != null) {
+            for (Expression exp : exps) {
+                addExpression(node, exp);
+            }
+        }
+
+//        ArrayList<Category> linkedCategories = category.getLinkedCategories();
+//
+//        if (linkedCategories != null) {
+//            for (Category linkedCat : linkedCategories) {
+//                Node otherNode = addCategory(linkedCat);
+//                if (node != null && !existsRelationship(node, otherNode, RelTypes.LINKED)) {
+//                    Relationship rel = node.createRelationshipTo(otherNode, RelTypes.LINKED);
+//                    // TODO kell valami property a kapcsolathoz?
+//                }
+//            }
+//        }
+        return node;
+    }
+
+    public Node addExpression(Node group, Expression exp) {
+        if (tx == null) {
+            throw new IllegalStateException("Must be in a transaction!");
+        }
+
+        Node node = findExpression(exp.getValue());
+
+        if (node == null) {
+            try {
+                node = graphDb.createNode();
+
+                node.setProperty(DetailConstants.PROP_KEY_E_VALUE, exp.getValue());
+                node.setProperty(DetailConstants.PROP_KEY_E_NEUTRAL, exp.getNeutral());
+
+                node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_EXPRESSION);
+
+                addExpressionToFullTextIndex(node, exp.getValue());
+            } catch (Exception e) {
+                tx.failure();
+            }
+        }
+
+        if (node != null && !existsRelationship(group, node, RelTypes.GROUPED)) {
+            Relationship rel = node.createRelationshipTo(group, RelTypes.GROUPED);
+            // TODO kell valami property a kapcsolathoz?
+        }
+
+        return node;
+    }
+
+    private void addExpressionToFullTextIndex(Node node, String index) {
+        if (indexExpressions == null) {
+            return;
+        }
+
+        indexExpressions.add(node, DetailConstants.PROP_KEY_E_VALUE, index);
     }
 }

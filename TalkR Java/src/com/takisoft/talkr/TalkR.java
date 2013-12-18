@@ -108,7 +108,7 @@ public class TalkR extends JFrame implements XMLParserListener {
         }
         
         //TODO remove this
-        initDatabaseFromCustomFile();
+        //initDatabaseFromCustomFile();
         
         analyzer = new Analyzer(resolver);
 
@@ -128,7 +128,8 @@ public class TalkR extends JFrame implements XMLParserListener {
         userInput.setText("");
 
         board.add(new Message(Who.HUMAN, input));
-        analyzer.analyzeSentence(input);
+        //analyzer.analyzeSentence(input);
+        analyzer.analyzeInput(input);
     }
 
     private void testFindWords() {
@@ -250,7 +251,14 @@ public class TalkR extends JFrame implements XMLParserListener {
         //Map<String, String> dbConfig = new HashMap<>();
         String nodeIndices = DetailConstants.PROP_KEY_OBJECT_ID + ",";
         nodeIndices += DetailConstants.PROP_KEY_TYPE + ",";
-        nodeIndices += DetailConstants.PROP_KEY_WORD_TYPE;
+        nodeIndices += DetailConstants.PROP_KEY_WORD_TYPE + ",";
+        
+        nodeIndices += DetailConstants.PROP_KEY_G_ID + ",";
+        nodeIndices += DetailConstants.PROP_KEY_G_INDEX + ",";
+        
+        nodeIndices += DetailConstants.PROP_KEY_E_VALUE + ",";
+        nodeIndices += DetailConstants.PROP_KEY_E_NEUTRAL;
+        
 
         //String relIndices = DetailConstants.PROP_;
         graphDb = graphDbBuilder.setConfig(GraphDatabaseSettings.node_keys_indexable, nodeIndices).
@@ -345,40 +353,18 @@ public class TalkR extends JFrame implements XMLParserListener {
             Group[] groups = gson.fromJson(br, Group[].class);
 
             for (Group group : groups) {
-                System.out.println(group.id);
-                if(group.expressions != null){
-                    for(Expression exp : group.expressions){
-                        System.out.println("-- " + exp.value + " | " + exp.neutral);
-                    }
-                }
+                System.out.println(group.getId());
+                resolver.addGroup(group);
+//                if(group.getExpressions() != null){
+//                    for(Expression exp : group.getExpressions()){
+//                        System.out.println("-- " + exp.getValue() + " | " + exp.getNeutral());
+//                    }
+//                }
             }
 
         } catch (IOException e) {
             System.err.println(e);
         }
-    }
-
-    private void initDatabaseFromCustomFile2() {
-        JsonReader reader2 = null;
-
-        try (FileInputStream fis = new FileInputStream("custom_expressions.js")) {
-            try (JsonReader reader = new JsonReader(new InputStreamReader(fis, "UTF-8"))) {
-                //return readExpressionArray(reader);
-            }
-        } catch (IOException e) {
-            System.err.println(e);
-        }
-    }
-
-    public List<Message> readExpressionArray(JsonReader reader) throws IOException {
-        List<Message> messages = new ArrayList<>();
-
-        reader.beginArray();
-        while (reader.hasNext()) {
-            //messages.add(readMessage(reader));
-        }
-        reader.endArray();
-        return messages;
     }
 
     private static void registerShutdownHook(final GraphDatabaseService graphDb) {

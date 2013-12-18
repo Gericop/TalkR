@@ -1,5 +1,6 @@
 package com.takisoft.talkr.analyzer;
 
+import com.takisoft.talkr.ai.Expression;
 import com.takisoft.talkr.analyzer.AnalyzerConstants.VowelHarmony;
 import com.takisoft.talkr.data.Word;
 import com.takisoft.talkr.helper.NodeResolver;
@@ -15,10 +16,21 @@ import org.neo4j.graphdb.index.IndexHits;
  */
 public class Analyzer {
 
-    private NodeResolver resolver;
+    private final NodeResolver resolver;
 
     public Analyzer(NodeResolver resolver) {
         this.resolver = resolver;
+    }
+
+    public void analyzeInput(String sentence) {
+        IndexHits<Node> hits = resolver.getExpressionsWithFuzzy(sentence);
+
+        if (hits != null) {
+            for (Node n : hits) {
+                Expression e = new Expression(n);
+                System.out.println(e.getValue() + " | " + e.getNeutral() + " | " + hits.currentScore());
+            }
+        }
     }
 
     public void analyzeSentence(String sentence) {
@@ -107,7 +119,7 @@ public class Analyzer {
                     break;
             }
         } else {
-
+            // pff
         }
 
         return suffixed.toString();
