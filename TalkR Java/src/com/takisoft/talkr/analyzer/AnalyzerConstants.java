@@ -2,14 +2,28 @@ package com.takisoft.talkr.analyzer;
 
 /**
  * Constants that can help analyzing the input words.
+ *
  * @author Gericop
  */
 public class AnalyzerConstants {
 
     // magánhangzó-harmónia
-    public static final char[] VOWEL_FRONT = new char[]{'e', 'é', 'i', 'í', 'ö', 'ő', 'ü', 'ű'};
-    public static final char[] VOWEL_BACK = new char[]{'a', 'á', 'o', 'ó', 'u', 'ú'};
-    
+    public static enum VowelHarmony {
+
+        FRONT(new char[]{'e', 'é', 'i', 'í', 'ö', 'ő', 'ü', 'ű'}),
+        BACK(new char[]{'a', 'á', 'o', 'ó', 'u', 'ú'});
+
+        final char[] chars;
+
+        private VowelHarmony(char[] chars) {
+            this.chars = chars;
+        }
+        
+        public char[] getChars(){
+            return chars;
+        }
+    };
+
     // igekötők
     public static final String[] COVERBS = new String[]{
         "abba",

@@ -1,9 +1,11 @@
 package com.takisoft.talkr.analyzer;
 
+import com.takisoft.talkr.analyzer.AnalyzerConstants.VowelHarmony;
 import com.takisoft.talkr.data.Word;
 import com.takisoft.talkr.helper.NodeResolver;
 import com.takisoft.talkr.utils.Utils;
 import java.util.ArrayList;
+import java.util.Arrays;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.index.IndexHits;
 
@@ -60,6 +62,55 @@ public class Analyzer {
             }
             // TESZT VÉGE
         }
+    }
+
+    public String getSuffixForObject(String word) {
+        word = word.trim();
+        String w = word.trim();
+
+        ArrayList<VowelHarmony> harmony = new ArrayList<>();
+
+        char[] chars = w.toCharArray();
+        final char[] chFront = VowelHarmony.FRONT.getChars();
+        final char[] chBack = VowelHarmony.BACK.getChars();
+
+        Arrays.sort(chFront);
+        Arrays.sort(chBack);
+
+        for (char ch : chars) {
+            if (Arrays.binarySearch(chFront, ch) >= 0) {
+                harmony.add(VowelHarmony.FRONT);
+            } else if (Arrays.binarySearch(chBack, ch) >= 0) {
+                harmony.add(VowelHarmony.BACK);
+            }
+        }
+
+        char lastChar = w.charAt(w.length() - 1);
+        boolean lastCharVowel = (Arrays.binarySearch(chFront, lastChar) >= 0 || Arrays.binarySearch(chBack, lastChar) >= 0);
+
+        StringBuilder suffixed = new StringBuilder(word);
+
+        if (lastCharVowel) {
+            switch (lastChar) {
+                case 'a':
+                    suffixed.deleteCharAt(suffixed.length() - 1);
+                    suffixed.append('á');
+                    suffixed.append('t');
+                    break;
+                case 'e':
+                    suffixed.deleteCharAt(suffixed.length() - 1);
+                    suffixed.append('é');
+                    suffixed.append('t');
+                    break;
+                default:
+                    suffixed.append('t');
+                    break;
+            }
+        } else {
+
+        }
+
+        return suffixed.toString();
     }
 
     private ArrayList<Clause> getClauses(String sentence) {

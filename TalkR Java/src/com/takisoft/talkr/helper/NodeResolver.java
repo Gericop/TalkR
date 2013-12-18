@@ -10,6 +10,7 @@ import com.takisoft.talkr.data.Word;
 import com.takisoft.talkr.data.Word.WordType;
 import com.takisoft.talkr.utils.Utils;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -299,6 +300,30 @@ public class NodeResolver {
         }
 
         return null;
+    }
+    
+    public ArrayList<Node> findNodesByRelationship(Node node, RelTypes type){
+        ArrayList<Node> nodes = new ArrayList<>();
+        
+        Iterable<Relationship> iter = node.getRelationships(type);
+        for(Relationship rel : iter){
+            nodes.add(rel.getOtherNode(node));
+        }
+        
+        return nodes;
+    }
+    
+    public ArrayList<Category> findCategoriesByRelationship(Node node, RelTypes type){
+        ArrayList<Category> nodes = new ArrayList<>();
+        
+        Iterable<Relationship> iter = node.getRelationships(type);
+        for(Relationship rel : iter){
+            nodes.add(new Category(rel.getOtherNode(node)));
+        }
+        
+        Collections.sort(nodes);
+        
+        return nodes;
     }
 
     private void addNodeToFullTextIndex(Node node, String index) {

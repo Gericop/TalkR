@@ -1,6 +1,10 @@
 package com.takisoft.talkr;
 
+import com.google.gson.Gson;
+import com.google.gson.stream.JsonReader;
+import com.takisoft.talkr.ai.Expression;
 import com.takisoft.talkr.analyzer.Analyzer;
+import com.takisoft.talkr.data.Category;
 import com.takisoft.talkr.data.Coverb;
 import com.takisoft.talkr.data.DetailConstants;
 import com.takisoft.talkr.data.PageData;
@@ -17,12 +21,15 @@ import com.takisoft.talkr.utils.Utils;
 import java.awt.BorderLayout;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
-import javax.swing.BoxLayout;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
@@ -50,7 +57,7 @@ public class TalkR extends JFrame implements XMLParserListener {
 
     private final MessageBoard board = new MessageBoard();
     private final JTextArea userInput = new JTextArea(1, 80);
-    private final JScrollPane scrollPane = new JScrollPane(board, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+    private final JScrollPane scrollPane = new JScrollPane(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
     private final KeyAdapter keyListener;
 
@@ -68,21 +75,21 @@ public class TalkR extends JFrame implements XMLParserListener {
     }
 
     public void initWindow() {
-        setTitle("TalkR v0.1");
+        setTitle("TalkR v0.2");
         setSize(640, 480);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        
-        board.setScrollPane(scrollPane);
-        
+
+        scrollPane.setViewportView(board);
+
         add(scrollPane, BorderLayout.CENTER);
-        
+
         //userInput.setLineWrap(true);
         //userInput.setWrapStyleWord(true);
         userInput.addKeyListener(keyListener);
-        
+
         add(userInput, BorderLayout.SOUTH);
-        
+
         setVisible(true);
     }
 
@@ -94,12 +101,24 @@ public class TalkR extends JFrame implements XMLParserListener {
             initDatabaseFromXML();
             resolver.endTransaction();
 
+            resolver.beginTransaction();
+            initDatabaseFromCustomFile();
+            resolver.endTransaction();
         }
-
+        
+        //TODO remove this
+        initDatabaseFromCustomFile();
+        
         analyzer = new Analyzer(resolver);
 
-        testFindWords();
+        Node topicsNode = resolver.findCategory("Témák");
 
+        ArrayList<Category> topics = resolver.findCategoriesByRelationship(topicsNode, DetailConstants.RelTypes.LINKED);
+        for (Category c : topics) {
+            System.out.println("# " + c.getTitle().toLowerCase());
+        }
+
+        //testFindWords();
         //wordTester();
     }
 
@@ -108,7 +127,6 @@ public class TalkR extends JFrame implements XMLParserListener {
         userInput.setText("");
 
         board.add(new Message(Who.HUMAN, input));
-
         analyzer.analyzeSentence(input);
     }
 
@@ -257,6 +275,7 @@ public class TalkR extends JFrame implements XMLParserListener {
             JOptionPane.showMessageDialog(rootPane, "Could not find the XML in " + System.getProperty("user.dir"), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+
     int i = 0;
 
     @Override
@@ -317,6 +336,43 @@ public class TalkR extends JFrame implements XMLParserListener {
     public void onXMLParsingFinished() {
         System.out.println("### END OF XML PROCESSING ###");
         System.out.println("Total words processed: " + i);
+    }
+
+    private void initDatabaseFromCustomFile() {
+        try (BufferedReader br = new BufferedReader(new FileReader("custom_expressions.js"))) {
+            Gson gson = new Gson();
+            Expression[] exps = gson.fromJson(br, Expression[].class);
+
+            for (Expression exp : exps) {
+                System.out.println(exp.expression);
+            }
+
+        } catch (IOException e) {
+            System.err.println(e);
+        }
+    }
+
+    private void initDatabaseFromCustomFile2() {
+        JsonReader reader2 = null;
+
+        try (FileInputStream fis = new FileInputStream("custom_expressions.js")) {
+            try (JsonReader reader = new JsonReader(new InputStreamReader(fis, "UTF-8"))) {
+                //return readExpressionArray(reader);
+            }
+        } catch (IOException e) {
+            System.err.println(e);
+        }
+    }
+
+    public List<Message> readExpressionArray(JsonReader reader) throws IOException {
+        List<Message> messages = new ArrayList<>();
+
+        reader.beginArray();
+        while (reader.hasNext()) {
+            //messages.add(readMessage(reader));
+        }
+        reader.endArray();
+        return messages;
     }
 
     private static void registerShutdownHook(final GraphDatabaseService graphDb) {

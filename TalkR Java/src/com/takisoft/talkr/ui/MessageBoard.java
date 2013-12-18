@@ -14,14 +14,8 @@ public class MessageBoard extends JPanel {
 
     private static final int MAX_MESSAGES = 30;
 
-    private JScrollPane scrollPane;
-
     public MessageBoard() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-    }
-
-    public void setScrollPane(JScrollPane scrollPane) {
-        this.scrollPane = scrollPane;
     }
 
     @Override
@@ -32,12 +26,11 @@ public class MessageBoard extends JPanel {
         }
         Component c = super.add(comp);
         
-        Rectangle r = c.getBounds();
+        Rectangle s = getBounds(null);
         
-        scrollPane.scrollRectToVisible(r);
+        Rectangle r = new Rectangle(0, s.height, s.width, s.height);
+        scrollRectToVisible(r);
         
-        System.out.println(r);
-
         return c;
     }
 }
