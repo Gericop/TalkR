@@ -3,6 +3,7 @@ package com.takisoft.talkr;
 import com.google.gson.Gson;
 import com.google.gson.stream.JsonReader;
 import com.takisoft.talkr.ai.Expression;
+import com.takisoft.talkr.ai.Group;
 import com.takisoft.talkr.analyzer.Analyzer;
 import com.takisoft.talkr.data.Category;
 import com.takisoft.talkr.data.Coverb;
@@ -341,10 +342,15 @@ public class TalkR extends JFrame implements XMLParserListener {
     private void initDatabaseFromCustomFile() {
         try (BufferedReader br = new BufferedReader(new FileReader("custom_expressions.js"))) {
             Gson gson = new Gson();
-            Expression[] exps = gson.fromJson(br, Expression[].class);
+            Group[] groups = gson.fromJson(br, Group[].class);
 
-            for (Expression exp : exps) {
-                System.out.println(exp.expression);
+            for (Group group : groups) {
+                System.out.println(group.id);
+                if(group.expressions != null){
+                    for(Expression exp : group.expressions){
+                        System.out.println("-- " + exp.value + " | " + exp.neutral);
+                    }
+                }
             }
 
         } catch (IOException e) {
