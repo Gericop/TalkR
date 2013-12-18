@@ -32,4 +32,11 @@ public class Utils {
     public static String removePunctuation(String word){
         return word.replaceAll("[^a-zA-ZíóöúüőűáéÍÓÖÚÜŐŰÁÉ]", "");
     }
+    
+    public static String escapeString(String str){
+        str = str.replace("\"", "\\\"");
+        str = str.replace("\'", "\\\'");
+        
+        return str;
+    }
 }

@@ -1,13 +1,21 @@
 package com.takisoft.talkr.analyzer;
 
 import com.takisoft.talkr.ai.Expression;
+import com.takisoft.talkr.ai.Group;
 import com.takisoft.talkr.analyzer.AnalyzerConstants.VowelHarmony;
+import com.takisoft.talkr.data.DetailConstants;
 import com.takisoft.talkr.data.Word;
 import com.takisoft.talkr.helper.NodeResolver;
+import com.takisoft.talkr.ui.Message;
+import com.takisoft.talkr.ui.Message.Who;
+import com.takisoft.talkr.ui.MessageBoard;
 import com.takisoft.talkr.utils.Utils;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.index.IndexHits;
 
 /**
@@ -17,19 +25,59 @@ import org.neo4j.graphdb.index.IndexHits;
 public class Analyzer {
 
     private final NodeResolver resolver;
+    private final MessageBoard board;
 
-    public Analyzer(NodeResolver resolver) {
+    public Analyzer(MessageBoard board, NodeResolver resolver) {
         this.resolver = resolver;
+        this.board = board;
     }
 
     public void analyzeInput(String sentence) {
+        //sentence = Utils.escapeString(sentence);
+
+        System.out.println("Analyze input: " + sentence);
+        SecureRandom sr = new SecureRandom();
         IndexHits<Node> hits = resolver.getExpressionsWithFuzzy(sentence);
 
         if (hits != null) {
+            Expression mostProbable = null;
+
+            hits:
             for (Node n : hits) {
                 Expression e = new Expression(n);
-                System.out.println(e.getValue() + " | " + e.getNeutral() + " | " + hits.currentScore());
+
+                if (mostProbable == null) {
+                    mostProbable = e;
+                }
+
+                Iterable<Relationship> iter = n.getRelationships(DetailConstants.RelTypes.GROUPED);
+
+                rels:
+                for (Relationship rel : iter) {
+                    Group group = new Group(rel.getOtherNode(n));
+
+                    Integer response = null;
+                    if ((response = group.getResponse()) != null) {
+                        group = new Group(resolver.findGroup(response));
+                    }
+
+                    List<Expression> exps = group.getExpressions();
+                    Expression exp = exps.get(sr.nextInt(exps.size()));
+                    board.add(new Message(Who.ROBOT, exp.getValue()));
+                    break hits;
+                }
+
+                //System.out.println(e.getValue() + " | " + e.getNeutral() + " | " + hits.currentScore());
             }
+
+            //board.add(new Message(Who.ROBOT, mostProbable.getValue()));
+
+        } else {
+            Group noIdeaGroup = new Group(resolver.findGroup("general_no_idea"));
+            List<Expression> exps = noIdeaGroup.getExpressions();
+
+            Expression exp = exps.get(sr.nextInt(exps.size()));
+            board.add(new Message(Who.ROBOT, exp.getValue()));
         }
     }
 

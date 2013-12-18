@@ -1,8 +1,10 @@
 package com.takisoft.talkr.ai;
 
 import com.takisoft.talkr.data.DetailConstants;
+import java.util.ArrayList;
 import java.util.List;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Relationship;
 
 /**
  *
@@ -21,6 +23,16 @@ public class Group {
 
         if (node.hasProperty(DetailConstants.PROP_KEY_G_RESPONSE)) {
             response = (Integer) node.getProperty(DetailConstants.PROP_KEY_G_RESPONSE);
+        }
+
+        Iterable<Relationship> iter = node.getRelationships(DetailConstants.RelTypes.GROUPED);
+
+        for (Relationship rel : iter) {
+            if (expressions == null) {
+                expressions = new ArrayList<>();
+            }
+
+            expressions.add(new Expression(rel.getOtherNode(node)));
         }
     }
 

@@ -37,7 +37,6 @@ public class NodeResolver {
     private Transaction tx;
     private Index<Node> indexWords;
     private Index<Node> indexWordsWoAccentMark;
-
     private Index<Node> indexExpressions;
 
     public NodeResolver(GraphDatabaseService graphDb) {
@@ -48,16 +47,16 @@ public class NodeResolver {
 
     private void createFullTextIndex() {
         IndexManager index = graphDb.index();
-        indexWords = index.forNodes("words-fulltext",
+        indexWords = index.forNodes("words_fulltext",
                 MapUtil.stringMap(IndexManager.PROVIDER, "lucene", "type", "fulltext"));
 
-        indexExpressions = index.forNodes("exps-fulltext",
+        indexExpressions = index.forNodes("exps_fulltext",
                 MapUtil.stringMap(IndexManager.PROVIDER, "lucene", "type", "fulltext"));
     }
 
     private void createAccentMarklessIndex() {
         IndexManager index = graphDb.index();
-        indexWordsWoAccentMark = index.forNodes("words-wo-accentmark",
+        indexWordsWoAccentMark = index.forNodes("words_wo_accentmark",
                 MapUtil.stringMap(IndexManager.PROVIDER, "lucene", "type", "fulltext"));
     }
 
@@ -453,6 +452,7 @@ public class NodeResolver {
     }
 
     public IndexHits<Node> getExpressionsWithFuzzy(String exp) {
+        System.out.println("get fuzzy: " + (exp + "~"));
         IndexHits<Node> hits = indexExpressions.query(DetailConstants.PROP_KEY_E_VALUE, exp + "~");
 
         if (!hits.hasNext()) {
@@ -466,6 +466,8 @@ public class NodeResolver {
         if (tx == null) {
             throw new IllegalStateException("Must be in a transaction!");
         }
+
+        System.out.println(group.getId());
 
         Node node = findGroup(group.getId());
 
@@ -484,6 +486,10 @@ public class NodeResolver {
             } catch (Exception e) {
                 tx.failure();
             }
+        }
+
+        if (node == null) {
+            System.err.println("Cannot create node!");
         }
 
         List<Expression> exps = group.getExpressions();
@@ -513,6 +519,8 @@ public class NodeResolver {
             throw new IllegalStateException("Must be in a transaction!");
         }
 
+        System.out.println("-- " + exp.getValue());
+
         Node node = findExpression(exp.getValue());
 
         if (node == null) {
@@ -520,14 +528,22 @@ public class NodeResolver {
                 node = graphDb.createNode();
 
                 node.setProperty(DetailConstants.PROP_KEY_E_VALUE, exp.getValue());
-                node.setProperty(DetailConstants.PROP_KEY_E_NEUTRAL, exp.getNeutral());
+                
+                if (exp.getNeutral() != null) {
+                    node.setProperty(DetailConstants.PROP_KEY_E_NEUTRAL, exp.getNeutral());
+                }
 
                 node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_EXPRESSION);
 
                 addExpressionToFullTextIndex(node, exp.getValue());
             } catch (Exception e) {
+                System.err.println(e);
                 tx.failure();
             }
+        }
+
+        if (node == null) {
+            System.err.println("Cannot create node!");
         }
 
         if (node != null && !existsRelationship(group, node, RelTypes.GROUPED)) {
@@ -542,6 +558,8 @@ public class NodeResolver {
         if (indexExpressions == null) {
             return;
         }
+
+        System.out.println("---- adding to fulltext index: " + index);
 
         indexExpressions.add(node, DetailConstants.PROP_KEY_E_VALUE, index);
     }

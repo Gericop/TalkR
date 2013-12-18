@@ -11,10 +11,13 @@ public class Expression {
 
     private String value;
     private String neutral;
+    private Node node;
 
     public Expression(Node node) {
         value = (String) node.getProperty(DetailConstants.PROP_KEY_E_VALUE);
-        neutral = (String) node.getProperty(DetailConstants.PROP_KEY_E_NEUTRAL);
+        if (node.hasProperty(DetailConstants.PROP_KEY_E_NEUTRAL)) {
+            neutral = (String) node.getProperty(DetailConstants.PROP_KEY_E_NEUTRAL);
+        }
     }
 
     /**

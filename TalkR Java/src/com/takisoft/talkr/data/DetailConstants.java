@@ -69,7 +69,7 @@ public class DetailConstants {
     // PROPERTY GROUP and EXPRESSION
     public static final String PROP_TYPE_GROUP = "group";
     public static final String PROP_KEY_G_RESPONSE = "response";
-    public static final String PROP_KEY_G_INDEX = "index";
+    public static final String PROP_KEY_G_INDEX = "groupIndex";
     public static final String PROP_KEY_G_ID = "groupId";
     
     public static final String PROP_TYPE_EXPRESSION = "expression";

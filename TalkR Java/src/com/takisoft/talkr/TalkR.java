@@ -55,11 +55,9 @@ public class TalkR extends JFrame implements XMLParserListener {
     private NodeResolver resolver;
     private GraphDatabaseService graphDb;
     private Analyzer analyzer;
-
     private final MessageBoard board = new MessageBoard();
     private final JTextArea userInput = new JTextArea(1, 80);
     private final JScrollPane scrollPane = new JScrollPane(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-
     private final KeyAdapter keyListener;
 
     public TalkR() {
@@ -98,26 +96,26 @@ public class TalkR extends JFrame implements XMLParserListener {
         startDatabase();
 
         if (!isWordDbReady) {
-            resolver.beginTransaction();
-            initDatabaseFromXML();
-            resolver.endTransaction();
+//            resolver.beginTransaction();
+//            initDatabaseFromXML();
+//            resolver.endTransaction();
 
             resolver.beginTransaction();
             initDatabaseFromCustomFile();
             resolver.endTransaction();
         }
-        
+
         //TODO remove this
         //initDatabaseFromCustomFile();
+
+        analyzer = new Analyzer(board, resolver);
+
+        /*Node topicsNode = resolver.findCategory("Témák");
         
-        analyzer = new Analyzer(resolver);
-
-        Node topicsNode = resolver.findCategory("Témák");
-
         ArrayList<Category> topics = resolver.findCategoriesByRelationship(topicsNode, DetailConstants.RelTypes.LINKED);
         for (Category c : topics) {
-            System.out.println("# " + c.getTitle().toLowerCase());
-        }
+        System.out.println("# " + c.getTitle().toLowerCase());
+        }*/
 
         //testFindWords();
         //wordTester();
@@ -249,16 +247,16 @@ public class TalkR extends JFrame implements XMLParserListener {
         GraphDatabaseBuilder graphDbBuilder = new GraphDatabaseFactory().newEmbeddedDatabaseBuilder(DB_PATH);
 
         //Map<String, String> dbConfig = new HashMap<>();
-        String nodeIndices = DetailConstants.PROP_KEY_OBJECT_ID + ",";
-        nodeIndices += DetailConstants.PROP_KEY_TYPE + ",";
-        nodeIndices += DetailConstants.PROP_KEY_WORD_TYPE + ",";
-        
+//        String nodeIndices = DetailConstants.PROP_KEY_OBJECT_ID + ",";
+//        nodeIndices += DetailConstants.PROP_KEY_TYPE + ",";
+//        nodeIndices += DetailConstants.PROP_KEY_WORD_TYPE + ",";
+        String nodeIndices = "";
         nodeIndices += DetailConstants.PROP_KEY_G_ID + ",";
         nodeIndices += DetailConstants.PROP_KEY_G_INDEX + ",";
-        
+
         nodeIndices += DetailConstants.PROP_KEY_E_VALUE + ",";
         nodeIndices += DetailConstants.PROP_KEY_E_NEUTRAL;
-        
+
 
         //String relIndices = DetailConstants.PROP_;
         graphDb = graphDbBuilder.setConfig(GraphDatabaseSettings.node_keys_indexable, nodeIndices).
@@ -284,7 +282,6 @@ public class TalkR extends JFrame implements XMLParserListener {
             JOptionPane.showMessageDialog(rootPane, "Could not find the XML in " + System.getProperty("user.dir"), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
-
     int i = 0;
 
     @Override
