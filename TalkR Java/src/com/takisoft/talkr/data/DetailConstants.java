@@ -72,7 +72,16 @@ public class DetailConstants {
     public static final String PROP_KEY_G_INDEX = "groupIndex";
     public static final String PROP_KEY_G_ID = "groupId";
     
+    public static final String PROP_KEY_G_ASK = "groupAsk";
+    public static final String PROP_KEY_G_ANSWER = "groupAnswer";
+    
     public static final String PROP_TYPE_EXPRESSION = "expression";
     public static final String PROP_KEY_E_VALUE = "value";
     public static final String PROP_KEY_E_NEUTRAL = "neutral";
+    
+    // HUMAN
+    public static final String PROP_TYPE_HUMAN = "human";
+    public static final String PROP_KEY_H_NAME = "humanName";
+    public static final String PROP_KEY_H_AGE = "humanAge";
+    public static final String PROP_KEY_H_LOCATION = "humanLocation";
 }

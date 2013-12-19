@@ -16,6 +16,7 @@ public class Group {
     private int index;
     private List<Expression> expressions;
     private Integer response;
+    private Programs programs;
 
     public Group(Node node) {
         id = (String) node.getProperty(DetailConstants.PROP_KEY_G_ID);
@@ -23,6 +24,21 @@ public class Group {
 
         if (node.hasProperty(DetailConstants.PROP_KEY_G_RESPONSE)) {
             response = (Integer) node.getProperty(DetailConstants.PROP_KEY_G_RESPONSE);
+        }
+
+        String ask = null;
+        String ans = null;
+
+        if (node.hasProperty(DetailConstants.PROP_KEY_G_ASK)) {
+            ask = (String) node.getProperty(DetailConstants.PROP_KEY_G_ASK);
+        }
+
+        if (node.hasProperty(DetailConstants.PROP_KEY_G_ANSWER)) {
+            ans = (String) node.getProperty(DetailConstants.PROP_KEY_G_ANSWER);
+        }
+
+        if (ask != null || ans != null) {
+            programs = new Programs(ask, ans);
         }
 
         Iterable<Relationship> iter = node.getRelationships(DetailConstants.RelTypes.GROUPED);
@@ -90,5 +106,12 @@ public class Group {
      */
     public void setResponse(Integer response) {
         this.response = response;
+    }
+
+    /**
+     * @return the programs
+     */
+    public Programs getPrograms() {
+        return programs;
     }
 }

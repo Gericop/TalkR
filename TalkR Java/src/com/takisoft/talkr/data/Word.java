@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.neo4j.graphdb.Node;
+import org.neo4j.graphdb.Relationship;
 
 /**
  *
@@ -42,9 +43,40 @@ public class Word {
     private ArrayList<Category> categories;
     WordType type = WordType.UNKNOWN;
 
+    public Word(Node node, boolean getAllElements) {
+        if (getAllElements) {
+            new Word(node);
+        } else {
+            wordString = (String) node.getProperty(DetailConstants.PROP_KEY_OBJECT_ID);
+            type = WordType.valueOf((String) node.getProperty(DetailConstants.PROP_KEY_WORD_TYPE));
+        }
+    }
+
     public Word(Node node) {
         wordString = (String) node.getProperty(DetailConstants.PROP_KEY_OBJECT_ID);
         type = WordType.valueOf((String) node.getProperty(DetailConstants.PROP_KEY_WORD_TYPE));
+
+        if (node.hasRelationship(DetailConstants.RelTypes.SYNONYM)) {
+            Iterable<Relationship> rels = node.getRelationships(DetailConstants.RelTypes.SYNONYM);
+            for (Relationship rel : rels) {
+                if (synonyms == null) {
+                    synonyms = new ArrayList<>();
+                }
+
+                synonyms.add(new Synonym(new Word(rel.getOtherNode(node), false).getWord()));
+            }
+        }
+
+        if (node.hasRelationship(DetailConstants.RelTypes.ANTONYM)) {
+            Iterable<Relationship> rels = node.getRelationships(DetailConstants.RelTypes.ANTONYM);
+            for (Relationship rel : rels) {
+                if (antonyms == null) {
+                    antonyms = new ArrayList<>();
+                }
+
+                antonyms.add(new Antonym(new Word(rel.getOtherNode(node), false).getWord()));
+            }
+        }
     }
 
     private Word() {

@@ -9,11 +9,19 @@ import com.takisoft.talkr.helper.NodeResolver;
 import com.takisoft.talkr.ui.Message;
 import com.takisoft.talkr.ui.Message.Who;
 import com.takisoft.talkr.ui.MessageBoard;
+import com.takisoft.talkr.utils.DynamicCompiler;
+import com.takisoft.talkr.utils.DynamicHelper;
 import com.takisoft.talkr.utils.Utils;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.index.IndexHits;
@@ -26,17 +34,113 @@ public class Analyzer {
 
     private final NodeResolver resolver;
     private final MessageBoard board;
+    private final Class dynClass;
+    private Object dynProcessor;
+
+    private String lastId;
+    private Who lastWho;
+    private boolean expectingAnswer = false;
+
+    public RobotLife robot;
+    public HumanLife human;
+
+    SecureRandom sr = new SecureRandom();
+
+    Timer timer = new Timer(true);
+    AskAQuestionTask task;
+
+    public class AskAQuestionTask extends TimerTask {
+
+        @Override
+        public void run() {
+            if (human.getName() == null) {
+                Expression exp = getRandomExpressionForGroup("what_is_name");
+                ask("what_is_name", exp.getValue());
+            } else if (human.getAge() == -1) {
+                Expression exp = getRandomExpressionForGroup("what_is_age");
+                ask("what_is_age", exp.getValue());
+            } else if (human.getLocation() == null) {
+                Expression exp = getRandomExpressionForGroup("what_is_location");
+                ask("what_is_location", exp.getValue());
+            }
+
+            rescheduleQuestions();
+        }
+
+    }
+
+    public class NoProgramException extends RuntimeException {
+
+    }
 
     public Analyzer(MessageBoard board, NodeResolver resolver) {
         this.resolver = resolver;
         this.board = board;
+
+        this.robot = new RobotLife();
+        this.human = new HumanLife();
+
+        dynClass = DynamicCompiler.getDynamicProcessor();
+        try {
+            dynProcessor = dynClass.getConstructor(DynamicHelper.class).newInstance(new DynamicHelper(Analyzer.this, resolver));
+        } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+            System.err.println(ex);
+        }
+
+        rescheduleQuestions();
+    }
+
+    public final void rescheduleQuestions() {
+        if (task != null) {
+            task.cancel();
+        }
+        timer.purge();
+        task = new AskAQuestionTask();
+        timer.schedule(task, sr.nextInt(7000) + 5000);
+    }
+
+    public String processUsersQuestion(Group group, String question) throws NoProgramException {
+        try {
+            Method method = dynClass.getDeclaredMethod(DynamicCompiler.PREFIX_ANSWER + group.getId(), String.class);
+            return (String) method.invoke(dynProcessor, question);
+        } catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+            System.err.println(ex);
+            throw new NoProgramException();
+        }
+    }
+
+    public String processUsersAnswer(String answer) throws NoProgramException {
+        try {
+            Method method = dynClass.getDeclaredMethod(DynamicCompiler.PREFIX_ASK + lastId, String.class);
+            return (String) method.invoke(dynProcessor, answer);
+        } catch (NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException ex) {
+            System.err.println(ex);
+            throw new NoProgramException();
+        }
     }
 
     public void analyzeInput(String sentence) {
         //sentence = Utils.escapeString(sentence);
+        rescheduleQuestions();
+        System.out.println("input: " + sentence + " | expectingAnswer: " + expectingAnswer + " | lastId: " + lastId);
 
-        System.out.println("Analyze input: " + sentence);
-        SecureRandom sr = new SecureRandom();
+        if (expectingAnswer && lastId != null) {
+            expectingAnswer = false;
+            try {
+                String result = processUsersAnswer(sentence);
+                lastId = null;
+
+                if (result != null) {
+                    say(result);
+                    return;
+                } else {
+                    Expression exp = getRandomExpressionForGroup("why_no_answer");
+                    say(exp.getValue());
+                    return;
+                }
+            } catch (NoProgramException e) {
+            }
+        }
         IndexHits<Node> hits = resolver.getExpressionsWithFuzzy(sentence);
 
         if (hits != null) {
@@ -45,6 +149,8 @@ public class Analyzer {
             hits:
             for (Node n : hits) {
                 Expression e = new Expression(n);
+
+                System.out.println(e.getValue() + " | " + e.getNeutral() + " | " + hits.currentScore());
 
                 if (mostProbable == null) {
                     mostProbable = e;
@@ -55,33 +161,68 @@ public class Analyzer {
                 rels:
                 for (Relationship rel : iter) {
                     Group group = new Group(rel.getOtherNode(n));
+                    lastId = group.getId();
+                    lastWho = Who.HUMAN;
 
-                    Integer response = null;
+                    try {
+                        String result = processUsersQuestion(group, sentence);
+                        if (result != null) {
+                            say(result);
+                            break hits;
+                        }
+                    } catch (NoProgramException ex) {
+                    }
+
+                    Integer response;
                     if ((response = group.getResponse()) != null) {
                         group = new Group(resolver.findGroup(response));
+                        //lastId = group.getId();
                     }
 
                     List<Expression> exps = group.getExpressions();
                     Expression exp = exps.get(sr.nextInt(exps.size()));
-                    board.add(new Message(Who.ROBOT, exp.getValue()));
+                    if (response != null || (group.getPrograms() != null && group.getPrograms().getAsk() != null)) {
+                        ask(group.getId(), exp.getValue());
+                    } else {
+                        say(exp.getValue());
+                    }
                     break hits;
                 }
+            }
 
-                //System.out.println(e.getValue() + " | " + e.getNeutral() + " | " + hits.currentScore());
+            if (lastId != null && lastId.equals("hi") && human.getName() == null) {
+                Expression exp = getRandomExpressionForGroup("what_is_name");
+                ask("what_is_name", exp.getValue());
             }
 
             //board.add(new Message(Who.ROBOT, mostProbable.getValue()));
-
         } else {
-            Group noIdeaGroup = new Group(resolver.findGroup("general_no_idea"));
-            List<Expression> exps = noIdeaGroup.getExpressions();
-
-            Expression exp = exps.get(sr.nextInt(exps.size()));
-            board.add(new Message(Who.ROBOT, exp.getValue()));
+            Expression exp = getRandomExpressionForGroup("general_no_idea");
+            say(exp.getValue());
         }
     }
 
-    public void analyzeSentence(String sentence) {
+    private void say(String answer) {
+        board.add(new Message(Who.ROBOT, answer));
+    }
+
+    private void ask(String id, String question) {
+        board.add(new Message(Who.ROBOT, question));
+        lastId = id;
+        lastWho = Who.ROBOT;
+        expectingAnswer = true;
+    }
+
+    private Expression getRandomExpressionForGroup(String groupId) {
+        Group noIdeaGroup = new Group(resolver.findGroup(groupId));
+        List<Expression> exps = noIdeaGroup.getExpressions();
+
+        Expression exp = exps.get(sr.nextInt(exps.size()));
+        return exp;
+    }
+
+    @Deprecated
+    private void analyzeSentence(String sentence) {
         ArrayList<Clause> clauses = getClauses(sentence);
 
         // CSAK EGY ELŐTESZT

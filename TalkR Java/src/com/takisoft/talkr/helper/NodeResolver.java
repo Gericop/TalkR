@@ -482,6 +482,16 @@ public class NodeResolver {
                     node.setProperty(DetailConstants.PROP_KEY_G_RESPONSE, group.getResponse());
                 }
 
+                if (group.getPrograms() != null) {
+                    if (group.getPrograms().getAsk() != null) {
+                        node.setProperty(DetailConstants.PROP_KEY_G_ASK, group.getPrograms().getAsk());
+                    }
+
+                    if (group.getPrograms().getAnswer() != null) {
+                        node.setProperty(DetailConstants.PROP_KEY_G_ANSWER, group.getPrograms().getAnswer());
+                    }
+                }
+
                 node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_GROUP);
             } catch (Exception e) {
                 tx.failure();
@@ -514,44 +524,88 @@ public class NodeResolver {
         return node;
     }
 
-    public Node addExpression(Node group, Expression exp) {
+    public void addExpression(Node group, Expression exp) {
         if (tx == null) {
             throw new IllegalStateException("Must be in a transaction!");
         }
 
-        System.out.println("-- " + exp.getValue());
+        String value = exp.getValue();
 
-        Node node = findExpression(exp.getValue());
+        System.out.println("-- " + value);
 
-        if (node == null) {
-            try {
-                node = graphDb.createNode();
+        if (exp.getNeutral() != null) {
+            int i = 0;
+            String[] formulas = exp.getNeutral().split(";");
 
-                node.setProperty(DetailConstants.PROP_KEY_E_VALUE, exp.getValue());
-                
-                if (exp.getNeutral() != null) {
-                    node.setProperty(DetailConstants.PROP_KEY_E_NEUTRAL, exp.getNeutral());
+            for (String formula : formulas) {
+                String[] parts = formula.split(":");
+
+                String[] words = parts[1].substring(1, parts[1].length() - 1).split(",");
+
+                for (String word : words) {
+                    i++;
+                    if ((i %= 30) == 0) {
+                        endTransaction();
+                        beginTransaction();
+                    }
+
+                    String newValue = value.replaceAll("\\" + parts[0], word.trim());
+
+                    Node node = findExpression(newValue);
+
+                    if (node == null) {
+                        try {
+                            node = graphDb.createNode();
+
+                            node.setProperty(DetailConstants.PROP_KEY_E_VALUE, newValue);
+
+                            node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_EXPRESSION);
+
+                            addExpressionToFullTextIndex(node, newValue);
+                        } catch (Exception e) {
+                            System.err.println(e);
+                            tx.failure();
+                        }
+                    }
+
+                    if (node != null && !existsRelationship(group, node, RelTypes.GROUPED)) {
+                        Relationship rel = node.createRelationshipTo(group, RelTypes.GROUPED);
+                        // TODO kell valami property a kapcsolathoz?
+                    }
                 }
+            }
+        } else {
+            Node node = findExpression(value);
 
-                node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_EXPRESSION);
+            if (node == null) {
+                try {
+                    node = graphDb.createNode();
 
-                addExpressionToFullTextIndex(node, exp.getValue());
-            } catch (Exception e) {
-                System.err.println(e);
-                tx.failure();
+                    node.setProperty(DetailConstants.PROP_KEY_E_VALUE, value);
+
+                    if (exp.getNeutral() != null) {
+                        // TODO erre nem biztos, hogy szukseg van
+                        node.setProperty(DetailConstants.PROP_KEY_E_NEUTRAL, exp.getNeutral());
+                    }
+
+                    node.setProperty(DetailConstants.PROP_KEY_TYPE, DetailConstants.PROP_TYPE_EXPRESSION);
+
+                    addExpressionToFullTextIndex(node, value);
+                } catch (Exception e) {
+                    System.err.println(e);
+                    tx.failure();
+                }
+            }
+
+            if (node == null) {
+                System.err.println("Cannot create node!");
+            }
+
+            if (node != null && !existsRelationship(group, node, RelTypes.GROUPED)) {
+                Relationship rel = node.createRelationshipTo(group, RelTypes.GROUPED);
+                // TODO kell valami property a kapcsolathoz?
             }
         }
-
-        if (node == null) {
-            System.err.println("Cannot create node!");
-        }
-
-        if (node != null && !existsRelationship(group, node, RelTypes.GROUPED)) {
-            Relationship rel = node.createRelationshipTo(group, RelTypes.GROUPED);
-            // TODO kell valami property a kapcsolathoz?
-        }
-
-        return node;
     }
 
     private void addExpressionToFullTextIndex(Node node, String index) {

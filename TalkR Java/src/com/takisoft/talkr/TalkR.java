@@ -1,11 +1,8 @@
 package com.takisoft.talkr;
 
 import com.google.gson.Gson;
-import com.google.gson.stream.JsonReader;
-import com.takisoft.talkr.ai.Expression;
 import com.takisoft.talkr.ai.Group;
 import com.takisoft.talkr.analyzer.Analyzer;
-import com.takisoft.talkr.data.Category;
 import com.takisoft.talkr.data.Coverb;
 import com.takisoft.talkr.data.DetailConstants;
 import com.takisoft.talkr.data.PageData;
@@ -18,16 +15,16 @@ import com.takisoft.talkr.helper.NodeResolver;
 import com.takisoft.talkr.ui.Message;
 import com.takisoft.talkr.ui.Message.Who;
 import com.takisoft.talkr.ui.MessageBoard;
+import com.takisoft.talkr.utils.DynamicCompiler;
+import com.takisoft.talkr.utils.DynamicHelper;
 import com.takisoft.talkr.utils.Utils;
 import java.awt.BorderLayout;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
@@ -74,7 +71,7 @@ public class TalkR extends JFrame implements XMLParserListener {
     }
 
     public void initWindow() {
-        setTitle("TalkR v0.2");
+        setTitle("TalkR v0.3");
         setSize(640, 480);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
@@ -96,27 +93,25 @@ public class TalkR extends JFrame implements XMLParserListener {
         startDatabase();
 
         if (!isWordDbReady) {
-//            resolver.beginTransaction();
-//            initDatabaseFromXML();
-//            resolver.endTransaction();
+            resolver.beginTransaction();
+            initDatabaseFromXML();
+            resolver.endTransaction();
 
             resolver.beginTransaction();
             initDatabaseFromCustomFile();
             resolver.endTransaction();
         }
-
+        
         //TODO remove this
         //initDatabaseFromCustomFile();
-
         analyzer = new Analyzer(board, resolver);
 
         /*Node topicsNode = resolver.findCategory("Témák");
         
-        ArrayList<Category> topics = resolver.findCategoriesByRelationship(topicsNode, DetailConstants.RelTypes.LINKED);
-        for (Category c : topics) {
-        System.out.println("# " + c.getTitle().toLowerCase());
-        }*/
-
+         ArrayList<Category> topics = resolver.findCategoriesByRelationship(topicsNode, DetailConstants.RelTypes.LINKED);
+         for (Category c : topics) {
+         System.out.println("# " + c.getTitle().toLowerCase());
+         }*/
         //testFindWords();
         //wordTester();
     }
@@ -124,6 +119,9 @@ public class TalkR extends JFrame implements XMLParserListener {
     private void sendDataToAnalyzer() {
         String input = userInput.getText();
         userInput.setText("");
+        if (input.trim().isEmpty()) {
+            return;
+        }
 
         board.add(new Message(Who.HUMAN, input));
         //analyzer.analyzeSentence(input);
@@ -257,7 +255,6 @@ public class TalkR extends JFrame implements XMLParserListener {
         nodeIndices += DetailConstants.PROP_KEY_E_VALUE + ",";
         nodeIndices += DetailConstants.PROP_KEY_E_NEUTRAL;
 
-
         //String relIndices = DetailConstants.PROP_;
         graphDb = graphDbBuilder.setConfig(GraphDatabaseSettings.node_keys_indexable, nodeIndices).
                 setConfig(GraphDatabaseSettings.relationship_keys_indexable, "chance").
@@ -358,6 +355,12 @@ public class TalkR extends JFrame implements XMLParserListener {
 //                    }
 //                }
             }
+            
+            File dir = new File(DynamicCompiler.COMPILATION_PATH);
+            if(!dir.exists()){
+                dir.mkdir();
+            }
+            DynamicCompiler.compile(groups);
 
         } catch (IOException e) {
             System.err.println(e);
